@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from
 import UPNG from 'upng-js';
 import { 
   Upload, Trash2, Clock, Download, Sun, Moon, 
-  Move, ZoomIn, RotateCcw, X, Play
+  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw
 } from 'lucide-react';
 import './App.css';
 
@@ -16,13 +16,14 @@ interface Frame {
   offsetX: number;
   offsetY: number;
   scale: number;
+  rotation: number; // Added rotation
 }
 
 interface EditModalProps {
   frame: Frame;
   baseWidth: number;
   baseHeight: number;
-  onSave: (id: string, x: number, y: number, scale: number) => void;
+  onSave: (id: string, x: number, y: number, scale: number, rotation: number) => void;
   onClose: () => void;
 }
 
@@ -31,18 +32,17 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
   const wrapperRef = useRef<HTMLDivElement>(null);
   const [offset, setOffset] = useState({ x: frame.offsetX, y: frame.offsetY });
   const [scale, setScale] = useState(frame.scale || 1);
+  const [rotation, setRotation] = useState(frame.rotation || 0);
   const [isDragging, setIsDragging] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
   const [imageBitmap, setImageBitmap] = useState<ImageBitmap | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [viewScale, setViewScale] = useState(1);
 
-  // Lock body scroll when modal is open
+  // Lock body scroll
   useEffect(() => {
     document.body.classList.add('modal-open');
-    return () => {
-      document.body.classList.remove('modal-open');
-    };
+    return () => document.body.classList.remove('modal-open');
   }, []);
 
   useEffect(() => {
@@ -70,13 +70,23 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    if (canvas.width !== canvasSize.width || canvas.height !== canvasSize.height) {
-        canvas.width = canvasSize.width;
-        canvas.height = canvasSize.height;
+    // High DPI Support
+    const dpr = window.devicePixelRatio || 1;
+    // Set actual size in memory (scaled to account for extra pixel density)
+    if (canvas.width !== canvasSize.width * dpr || canvas.height !== canvasSize.height * dpr) {
+      canvas.width = canvasSize.width * dpr;
+      canvas.height = canvasSize.height * dpr;
+      // Normalize coordinate system to use css pixels
+      ctx.scale(dpr, dpr);
     }
 
-    const cw = canvas.width;
-    const ch = canvas.height;
+    // Set visual size
+    canvas.style.width = `${canvasSize.width}px`;
+    canvas.style.height = `${canvasSize.height}px`;
+
+    const cw = canvasSize.width;
+    const ch = canvasSize.height;
+
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
@@ -96,15 +106,24 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
       }
     }
 
-    // 2. Draw the User Image
-    const imgDrawW = imageBitmap.width * viewScale * scale;
-    const imgDrawH = imageBitmap.height * viewScale * scale;
-    const imgX = (cw / 2) + (offset.x * viewScale) - (imgDrawW / 2);
-    const imgY = (ch / 2) + (offset.y * viewScale) - (imgDrawH / 2);
+    // 2. Draw the User Image with Transformations
+    ctx.save();
+    
+    // Calculate center position of the image on canvas
+    // Canvas Center + Offset * viewScale
+    const cx = (cw / 2) + (offset.x * viewScale);
+    const cy = (ch / 2) + (offset.y * viewScale);
 
-    ctx.drawImage(imageBitmap, imgX, imgY, imgDrawW, imgDrawH);
+    ctx.translate(cx, cy);
+    ctx.rotate((rotation * Math.PI) / 180);
+    ctx.scale(scale * viewScale, scale * viewScale);
+    
+    // Draw image centered at origin (0,0)
+    ctx.drawImage(imageBitmap, -imageBitmap.width / 2, -imageBitmap.height / 2);
+    
+    ctx.restore();
 
-    // 3. Draw "Dim Overlay" OUTSIDE the base frame
+    // 3. Draw "Dim Overlay"
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
@@ -113,19 +132,19 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     ctx.fill('evenodd');
     ctx.restore();
 
-    // 4. Draw the Base Frame Border
+    // 4. Border
     ctx.strokeStyle = '#4c6ef5';
     ctx.lineWidth = 2;
     ctx.strokeRect(baseRectX, baseRectY, baseRectW, baseRectH);
 
-    // 5. Center Guidelines
+    // 5. Guidelines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.beginPath();
     ctx.moveTo(cw / 2, baseRectY); ctx.lineTo(cw / 2, baseRectY + baseRectH);
     ctx.moveTo(baseRectX, ch / 2); ctx.lineTo(baseRectX + baseRectW, ch / 2);
     ctx.stroke();
 
-  }, [imageBitmap, offset, scale, viewScale, baseWidth, baseHeight, canvasSize]);
+  }, [imageBitmap, offset, scale, rotation, viewScale, baseWidth, baseHeight, canvasSize]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -150,16 +169,17 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     setScale(prev => Math.max(0.01, Math.min(20, prev + delta)));
   };
 
-  const handleReset = () => { setOffset({ x: 0, y: 0 }); setScale(1); };
+  const handleReset = () => { setOffset({ x: 0, y: 0 }); setScale(1); setRotation(0); };
+
+  const adjustScale = (amount: number) => setScale(prev => Math.max(0.01, Math.min(20, parseFloat((prev + amount).toFixed(2)))));
+  const adjustRotation = (amount: number) => setRotation(prev => prev + amount);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Adjust Frame Position</h3>
-          <button className="close-modal-btn" onClick={onClose}>
-            <X size={24} />
-          </button>
+          <button className="close-modal-btn" onClick={onClose}><X size={24} /></button>
         </div>
         
         <div className="canvas-wrapper" ref={wrapperRef}>
@@ -175,25 +195,45 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
         </div>
 
         <div className="modal-footer">
-          <div className="slider-group">
-            <ZoomIn size={20} />
-            <span style={{minWidth: '4em', fontWeight: 'bold'}}>{(scale * 100).toFixed(0)}%</span>
-            <input 
-              type="range" 
-              min="0.01" 
-              max="20" 
-              step="0.05" 
-              value={scale} 
-              onChange={(e) => setScale(parseFloat(e.target.value))} 
-            />
-            <button className="btn btn-secondary" onClick={handleReset}>
-              <RotateCcw size={16} /> Reset
-            </button>
+          {/* Zoom Control */}
+          <div className="control-row">
+            <div className="slider-group">
+              <ZoomIn size={18} />
+              <label>Zoom</label>
+              <button className="btn-icon-small" onClick={() => adjustScale(-0.01)}><Minus size={14} /></button>
+              <input 
+                type="range" 
+                min="0.01" max="5" step="0.01" 
+                value={scale} 
+                onChange={(e) => setScale(parseFloat(e.target.value))} 
+                style={{flex: 1}}
+              />
+              <button className="btn-icon-small" onClick={() => adjustScale(0.01)}><Plus size={14} /></button>
+              <span className="value-badge">{(scale * 100).toFixed(0)}%</span>
+            </div>
+
+            {/* Rotation Control */}
+            <div className="slider-group">
+              <RefreshCw size={18} />
+              <label>Rotate</label>
+              <button className="btn-icon-small" onClick={() => adjustRotation(-90)} title="-90°"><RotateCcw size={14} /></button>
+              <input 
+                type="range" 
+                min="-180" max="180" step="1" 
+                value={rotation} 
+                onChange={(e) => setRotation(parseInt(e.target.value))} 
+                style={{flex: 1}}
+              />
+              <button className="btn-icon-small" onClick={() => adjustRotation(90)} title="+90°"><RefreshCw size={14} /></button>
+              <span className="value-badge">{rotation}°</span>
+            </div>
           </div>
           
-          <div className="button-group">
+          <div className="button-group" style={{marginTop: '1rem'}}>
+            <button className="btn btn-secondary" onClick={handleReset}>Reset All</button>
+            <div style={{flex: 1}}></div>
             <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
-            <button className="btn btn-primary" onClick={() => onSave(frame.id, offset.x, offset.y, scale)}>Save Changes</button>
+            <button className="btn btn-primary" onClick={() => onSave(frame.id, offset.x, offset.y, scale, rotation)}>Save Changes</button>
           </div>
         </div>
       </div>
@@ -212,11 +252,7 @@ function App() {
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
 
-  // Theme Toggle Effect
-  useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
-  }, [theme]);
-
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const handleFiles = useCallback(async (fileList: FileList | null) => {
@@ -235,7 +271,8 @@ function App() {
         height: bmp.height,
         offsetX: 0,
         offsetY: 0,
-        scale: 1
+        scale: 1,
+        rotation: 0
       });
     }
     setFrames(prev => [...prev, ...newFramesData]);
@@ -244,11 +281,7 @@ function App() {
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); };
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); handleFiles(e.dataTransfer.files); };
-
-  const handleClearAll = () => {
-    setFrames([]);
-    setGeneratedApng(null);
-  };
+  const handleClearAll = () => { setFrames([]); setGeneratedApng(null); };
 
   const removeFrame = (id: string) => {
     setFrames(prev => {
@@ -276,8 +309,8 @@ function App() {
   };
   const handleSortEnd = () => setDraggedFrameId(null);
 
-  const saveFrameOffset = (id: string, x: number, y: number, scale: number) => {
-    setFrames(prev => prev.map(f => f.id === id ? { ...f, offsetX: x, offsetY: y, scale } : f));
+  const saveFrameOffset = (id: string, x: number, y: number, scale: number, rotation: number) => {
+    setFrames(prev => prev.map(f => f.id === id ? { ...f, offsetX: x, offsetY: y, scale, rotation } : f));
     setEditingFrame(null);
   };
 
@@ -294,16 +327,33 @@ function App() {
       canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error("Could not get canvas context");
+
       for (let i = 0; i < frames.length; i++) {
         const img = imageBitmaps[i];
         const frame = frames[i];
         const scale = frame.scale || 1;
+        const rotation = frame.rotation || 0;
+
         ctx.clearRect(0, 0, width, height);
-        const drawW = img.width * scale;
-        const drawH = img.height * scale;
-        const x = (width / 2) + frame.offsetX - (drawW / 2);
-        const y = (height / 2) + frame.offsetY - (drawH / 2);
-        ctx.drawImage(img, x, y, drawW, drawH);
+        ctx.save();
+        
+        // Transform
+        // 1. Translate to image center position
+        const cx = (width / 2) + frame.offsetX;
+        const cy = (height / 2) + frame.offsetY;
+        ctx.translate(cx, cy);
+        
+        // 2. Rotate
+        ctx.rotate((rotation * Math.PI) / 180);
+        
+        // 3. Scale
+        ctx.scale(scale, scale);
+        
+        // 4. Draw image centered
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        
+        ctx.restore();
+        
         const imageData = ctx.getImageData(0, 0, width, height);
         buffers.push(imageData.data.buffer);
       }
