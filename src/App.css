@@ -44,6 +44,8 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   transition: background-color 0.3s, color 0.3s;
+  margin: 0;
+  min-height: 100vh;
 }
 
 body.modal-open {
@@ -57,9 +59,6 @@ body.modal-open {
   padding: 2rem;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  flex: 1;
 }
 
 /* Header & Theme Toggle */
@@ -368,20 +367,20 @@ h1 {
   background: var(--bg-secondary);
   width: 95vw;
   max-width: 1000px;
-  height: 85vh;
+  height: 92vh;
   border-radius: 16px;
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--border-color);
-  padding: 1.5rem;
+  padding: 1rem;
 }
 
 .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .modal-header h3 { margin: 0; color: var(--text-primary); }
@@ -419,8 +418,8 @@ h1 {
 }
 
 .modal-footer {
-  margin-top: 1rem;
-  padding-top: 1rem;
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
   border-top: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
