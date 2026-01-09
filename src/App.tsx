@@ -419,7 +419,7 @@ function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1>APNG Creator</h1>
+        <h1>Animated Image Creator</h1>
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
