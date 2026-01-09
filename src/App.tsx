@@ -281,6 +281,11 @@ function App() {
       });
     }
     setFrames(prev => [...prev, ...newFramesData]);
+
+    // Clear file input value to allow re-uploading the same files
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   }, [globalDelay]);
 
   const handleSmartAlign = () => {
@@ -316,7 +321,17 @@ function App() {
     setFrames(prev => {
       const frame = prev.find(f => f.id === id);
       if (frame) URL.revokeObjectURL(frame.previewUrl);
-      return prev.filter(f => f.id !== id);
+      const newFrames = prev.filter(f => f.id !== id);
+
+      // If this was the last frame being removed, clear output like Clear All does
+      if (newFrames.length === 0) {
+        setGeneratedApng(null);
+        setGeneratedWebP(null);
+        setResultSize(null);
+        setExportFileName("animation");
+      }
+
+      return newFrames;
     });
   };
 
