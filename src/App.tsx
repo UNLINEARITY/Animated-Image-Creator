@@ -94,7 +94,7 @@ function App() {
         ctx.drawImage(img, x, y);
         
         const imageData = ctx.getImageData(0, 0, width, height);
-        buffers.push(imageData.data);
+        buffers.push(imageData.data.buffer);
       }
 
       // Encode APNG

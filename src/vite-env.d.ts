@@ -3,7 +3,7 @@
 declare module 'upng-js' {
   export interface UPNG {
     encode(
-      imgs: ArrayLike<number>[],
+      imgs: ArrayBuffer[],
       w: number,
       h: number,
       cnum: number,
