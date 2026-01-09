@@ -1,0 +1,121 @@
+.container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.dropzone {
+  border: 2px dashed #646cff;
+  border-radius: 12px;
+  padding: 3rem;
+  margin: 2rem 0;
+  background-color: rgba(100, 108, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.dropzone:hover, .dropzone.active {
+  background-color: rgba(100, 108, 255, 0.2);
+  transform: scale(1.01);
+}
+
+.file-input {
+  display: none;
+}
+
+.controls {
+  margin: 2rem 0;
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.frame-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+}
+
+.frame-item {
+  background: #1a1a1a;
+  border-radius: 8px;
+  padding: 1rem;
+  position: relative;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.frame-preview {
+  width: 100px;
+  height: 100px;
+  object-fit: contain;
+  background: #333; /* Checkerboard pattern could go here */
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+}
+
+.frame-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.frame-number {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  background: rgba(0,0,0,0.7);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+}
+
+.remove-btn {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  background: #ff4444;
+  color: white;
+  border: none;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  line-height: 1;
+}
+
+.preview-section {
+  margin-top: 3rem;
+  border-top: 1px solid #444;
+  padding-top: 2rem;
+}
+
+.result-preview {
+  max-width: 100%;
+  max-height: 500px;
+  border: 1px solid #444;
+  background-image: 
+    linear-gradient(45deg, #333 25%, transparent 25%), 
+    linear-gradient(-45deg, #333 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #333 75%), 
+    linear-gradient(-45deg, transparent 75%, #333 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+input[type="number"] {
+  padding: 0.4em;
+  border-radius: 4px;
+  border: 1px solid #555;
+  background: #2a2a2a;
+  color: white;
+  width: 60px;
+}
