@@ -15,10 +15,18 @@
 
 body {
   margin: 0;
-  display: flex;
+  padding: 0;
   min-width: 320px;
   min-height: 100vh;
-  /* place-items: center;  <-- REMOVED THIS */
+  width: 100%;
+}
+
+/* Ensure the React root div takes full width */
+#root {
+  width: 100%;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 
 h1 {
