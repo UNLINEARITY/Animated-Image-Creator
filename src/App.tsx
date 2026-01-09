@@ -280,7 +280,20 @@ function App() {
         fileType: file.type.split('/')[1].toUpperCase().replace('JPEG', 'JPG')
       });
     }
-    setFrames(prev => [...prev, ...newFramesData]);
+    setFrames(prev => {
+      const combined = [...prev, ...newFramesData];
+      // Ensure base frame (first frame) always has no transforms applied
+      if (combined.length > 0) {
+        combined[0] = {
+          ...combined[0],
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+          rotation: 0
+        };
+      }
+      return combined;
+    });
 
     // Clear file input value to allow re-uploading the same files
     if (fileInputRef.current) {
@@ -331,6 +344,23 @@ function App() {
         setExportFileName("animation");
       }
 
+      // If we deleted a frame and now only have 1 frame left, reset that frame's scale to 1
+      // This ensures the new base frame is not stuck with Smart Align scale
+      if (newFrames.length === 1) {
+        newFrames[0] = { ...newFrames[0], scale: 1, offsetX: 0, offsetY: 0, rotation: 0 };
+      }
+
+      // Ensure base frame (first frame) always has no transforms applied
+      if (newFrames.length > 0) {
+        newFrames[0] = {
+          ...newFrames[0],
+          scale: 1,
+          offsetX: 0,
+          offsetY: 0,
+          rotation: 0
+        };
+      }
+
       return newFrames;
     });
   };
@@ -349,6 +379,18 @@ function App() {
     const newFrames = [...frames];
     const [removed] = newFrames.splice(draggedIndex, 1);
     newFrames.splice(targetIndex, 0, removed);
+
+    // Ensure base frame (first frame) always has no transforms applied
+    if (newFrames.length > 0) {
+      newFrames[0] = {
+        ...newFrames[0],
+        scale: 1,
+        offsetX: 0,
+        offsetY: 0,
+        rotation: 0
+      };
+    }
+
     setFrames(newFrames);
   };
   const handleSortEnd = () => setDraggedFrameId(null);
