@@ -1,5 +1,9 @@
 import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import UPNG from 'upng-js';
+import { 
+  Upload, Trash2, Clock, Download, Sun, Moon, 
+  Move, ZoomIn, RotateCcw, X, Play
+} from 'lucide-react';
 import './App.css';
 
 interface Frame {
@@ -30,37 +34,31 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
   const [isDragging, setIsDragging] = useState(false);
   const [lastPos, setLastPos] = useState({ x: 0, y: 0 });
   const [imageBitmap, setImageBitmap] = useState<ImageBitmap | null>(null);
-  
-  // Dynamic Canvas Size
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
-  // View Scale (how many canvas pixels per 1 logic pixel)
   const [viewScale, setViewScale] = useState(1);
 
-  // Initialize: Load Image & Fit Canvas
+  // Lock body scroll when modal is open
+  useEffect(() => {
+    document.body.classList.add('modal-open');
+    return () => {
+      document.body.classList.remove('modal-open');
+    };
+  }, []);
+
   useEffect(() => {
     createImageBitmap(frame.file).then(setImageBitmap);
   }, [frame.file]);
 
   useLayoutEffect(() => {
     if (!wrapperRef.current) return;
-    
     const updateSize = () => {
       if (!wrapperRef.current) return;
       const { clientWidth, clientHeight } = wrapperRef.current;
       setCanvasSize({ width: clientWidth, height: clientHeight });
-
-      // Calculate best fit viewScale
-      // We want the base frame to fit within the canvas with some padding
-      const padding = 80;
-      const fitScale = Math.min(
-        (clientWidth - padding) / baseWidth,
-        (clientHeight - padding) / baseHeight
-      );
-      // Don't let it get too huge or too tiny unnecessarily, 
-      // but 'fitScale' is usually the right baseline.
+      const padding = 100;
+      const fitScale = Math.min((clientWidth - padding) / baseWidth, (clientHeight - padding) / baseHeight);
       setViewScale(fitScale > 0 ? fitScale : 1);
     };
-
     updateSize();
     window.addEventListener('resize', updateSize);
     return () => window.removeEventListener('resize', updateSize);
@@ -72,8 +70,6 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas internal resolution to match display size for sharpness
-    // (High DPI support could be added here by multiplying by devicePixelRatio)
     if (canvas.width !== canvasSize.width || canvas.height !== canvasSize.height) {
         canvas.width = canvasSize.width;
         canvas.height = canvasSize.height;
@@ -81,12 +77,9 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 
     const cw = canvas.width;
     const ch = canvas.height;
-
-    // Use high quality smoothing
     ctx.imageSmoothingEnabled = true;
     ctx.imageSmoothingQuality = 'high';
 
-    // Calculate the centered base frame rectangle on canvas
     const baseRectW = baseWidth * viewScale;
     const baseRectH = baseHeight * viewScale;
     const baseRectX = (cw - baseRectW) / 2;
@@ -94,48 +87,47 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 
     ctx.clearRect(0, 0, cw, ch);
 
-    // 1. Draw the user's image (Apply transforms)
+    // 1. Draw Checkerboard Background
+    const gridSize = 15;
+    for (let y = 0; y < ch; y += gridSize) {
+      for (let x = 0; x < cw; x += gridSize) {
+        ctx.fillStyle = (Math.floor(x / gridSize) + Math.floor(y / gridSize)) % 2 === 0 ? '#1a1a1a' : '#222';
+        ctx.fillRect(x, y, gridSize, gridSize);
+      }
+    }
+
+    // 2. Draw the User Image
     const imgDrawW = imageBitmap.width * viewScale * scale;
     const imgDrawH = imageBitmap.height * viewScale * scale;
-    
-    // The user's offset is relative to the CENTER of the Base Frame.
-    // Canvas Center = (cw/2, ch/2)
-    // Image Center = Canvas Center + (offset * viewScale)
-    // Image TopLeft = Image Center - (imgSize / 2)
     const imgX = (cw / 2) + (offset.x * viewScale) - (imgDrawW / 2);
     const imgY = (ch / 2) + (offset.y * viewScale) - (imgDrawH / 2);
 
     ctx.drawImage(imageBitmap, imgX, imgY, imgDrawW, imgDrawH);
 
-    // 2. Draw the "Overlay Mask" (The dark area)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
-    ctx.fillRect(0, 0, cw, ch);
+    // 3. Draw "Dim Overlay" OUTSIDE the base frame
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, 0, cw, ch);
+    ctx.rect(baseRectX, baseRectY, baseRectW, baseRectH);
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'; 
+    ctx.fill('evenodd');
+    ctx.restore();
 
-    // 3. "Cut out" the Base Frame area
-    ctx.globalCompositeOperation = 'destination-out';
-    ctx.fillRect(baseRectX, baseRectY, baseRectW, baseRectH);
-    ctx.globalCompositeOperation = 'source-over';
-
-    // 4. Draw the Border for the Base Frame
-    ctx.strokeStyle = '#646cff';
+    // 4. Draw the Base Frame Border
+    ctx.strokeStyle = '#4c6ef5';
     ctx.lineWidth = 2;
     ctx.strokeRect(baseRectX, baseRectY, baseRectW, baseRectH);
 
-    // Optional: Center Crosshair
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
+    // 5. Center Guidelines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.beginPath();
-    ctx.moveTo(cw / 2, baseRectY);
-    ctx.lineTo(cw / 2, baseRectY + baseRectH);
-    ctx.moveTo(baseRectX, ch / 2);
-    ctx.lineTo(baseRectX + baseRectW, ch / 2);
+    ctx.moveTo(cw / 2, baseRectY); ctx.lineTo(cw / 2, baseRectY + baseRectH);
+    ctx.moveTo(baseRectX, ch / 2); ctx.lineTo(baseRectX + baseRectW, ch / 2);
     ctx.stroke();
 
   }, [imageBitmap, offset, scale, viewScale, baseWidth, baseHeight, canvasSize]);
 
-  useEffect(() => {
-    draw();
-  }, [draw]);
+  useEffect(() => { draw(); }, [draw]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
@@ -146,37 +138,28 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     if (!isDragging) return;
     const dx = e.clientX - lastPos.x;
     const dy = e.clientY - lastPos.y;
-    
-    // Convert screen movement to logical offset
-    setOffset(prev => ({
-      x: prev.x + dx / viewScale,
-      y: prev.y + dy / viewScale
-    }));
+    setOffset(prev => ({ x: prev.x + dx / viewScale, y: prev.y + dy / viewScale }));
     setLastPos({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMouseUp = () => {
-    setIsDragging(false);
-  };
+  const handleMouseUp = () => setIsDragging(false);
 
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault(); 
-    const delta = -e.deltaY * 0.001 * scale; // Scale speed proportional to current scale
-    const newScale = Math.max(0.05, Math.min(10, scale + delta));
-    setScale(newScale);
+    const delta = -e.deltaY * 0.001 * scale;
+    setScale(prev => Math.max(0.01, Math.min(20, prev + delta)));
   };
 
-  const handleReset = () => {
-    setOffset({ x: 0, y: 0 });
-    setScale(1);
-  };
+  const handleReset = () => { setOffset({ x: 0, y: 0 }); setScale(1); };
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content" onClick={e => e.stopPropagation()}>
         <div className="modal-header">
           <h3>Adjust Frame Position</h3>
-          <button className="close-modal-btn" onClick={onClose}>&times;</button>
+          <button className="close-modal-btn" onClick={onClose}>
+            <X size={24} />
+          </button>
         </div>
         
         <div className="canvas-wrapper" ref={wrapperRef}>
@@ -193,22 +176,24 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 
         <div className="modal-footer">
           <div className="slider-group">
-            <label>Zoom:</label>
-            <span style={{minWidth: '3.5em'}}>{(scale * 100).toFixed(0)}%</span>
+            <ZoomIn size={20} />
+            <span style={{minWidth: '4em', fontWeight: 'bold'}}>{(scale * 100).toFixed(0)}%</span>
             <input 
               type="range" 
-              min="0.05" 
-              max="10" 
+              min="0.01" 
+              max="20" 
               step="0.05" 
               value={scale} 
               onChange={(e) => setScale(parseFloat(e.target.value))} 
             />
-            <button className="action-btn secondary" onClick={handleReset} style={{padding: '0.4rem 0.8rem', fontSize: '0.8rem'}}>Reset</button>
+            <button className="btn btn-secondary" onClick={handleReset}>
+              <RotateCcw size={16} /> Reset
+            </button>
           </div>
           
           <div className="button-group">
-            <button className="action-btn secondary" onClick={onClose}>Cancel</button>
-            <button className="action-btn" onClick={() => onSave(frame.id, offset.x, offset.y, scale)}>Save Changes</button>
+            <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn btn-primary" onClick={() => onSave(frame.id, offset.x, offset.y, scale)}>Save Changes</button>
           </div>
         </div>
       </div>
@@ -225,16 +210,21 @@ function App() {
   const [editingFrame, setEditingFrame] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+
+  // Theme Toggle Effect
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
-
     const newFramesData: Frame[] = [];
-
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
       if (!file.type.startsWith('image/')) continue;
-      
       const bmp = await createImageBitmap(file);
       newFramesData.push({
         id: Math.random().toString(36).substr(2, 9),
@@ -245,16 +235,20 @@ function App() {
         height: bmp.height,
         offsetX: 0,
         offsetY: 0,
-        scale: 1 // Default scale
+        scale: 1
       });
     }
-
     setFrames(prev => [...prev, ...newFramesData]);
   }, [globalDelay]);
 
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); };
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); handleFiles(e.dataTransfer.files); };
+
+  const handleClearAll = () => {
+    setFrames([]);
+    setGeneratedApng(null);
+  };
 
   const removeFrame = (id: string) => {
     setFrames(prev => {
@@ -268,7 +262,6 @@ function App() {
     setFrames(prev => prev.map(f => f.id === id ? { ...f, delay: Math.max(0, delay) } : f));
   };
 
-  // Sorting
   const handleSortStart = (id: string) => setDraggedFrameId(id);
   const handleSortOver = (e: React.DragEvent, targetId: string) => {
     e.preventDefault();
@@ -291,53 +284,32 @@ function App() {
   const generateAPNG = async () => {
     if (frames.length === 0) return;
     setIsGenerating(true);
-
     try {
-      const imageBitmaps = await Promise.all(
-        frames.map(f => createImageBitmap(f.file))
-      );
-
-      // Base dimensions from the first frame
+      const imageBitmaps = await Promise.all(frames.map(f => createImageBitmap(f.file)));
       const width = imageBitmaps[0].width;
       const height = imageBitmaps[0].height;
-
       const buffers = [];
       const delays = frames.map(f => f.delay);
-
       const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
+      canvas.width = width; canvas.height = height;
       const ctx = canvas.getContext('2d');
-
       if (!ctx) throw new Error("Could not get canvas context");
-
       for (let i = 0; i < frames.length; i++) {
         const img = imageBitmaps[i];
         const frame = frames[i];
-        const scale = frame.scale || 1; // Default to 1
-
+        const scale = frame.scale || 1;
         ctx.clearRect(0, 0, width, height);
-        
-        // Final draw logic:
-        // Center of canvas is (width/2, height/2)
-        // Image center should be at (width/2 + offsetX, height/2 + offsetY)
-        // Image size is img.width * scale, img.height * scale
-        
         const drawW = img.width * scale;
         const drawH = img.height * scale;
         const x = (width / 2) + frame.offsetX - (drawW / 2);
         const y = (height / 2) + frame.offsetY - (drawH / 2);
-        
         ctx.drawImage(img, x, y, drawW, drawH);
-        
         const imageData = ctx.getImageData(0, 0, width, height);
         buffers.push(imageData.data.buffer);
       }
-
       const apngBuffer = UPNG.encode(buffers, width, height, 0, delays);
       const blob = new Blob([apngBuffer], { type: 'image/png' });
       const url = URL.createObjectURL(blob);
-      
       setGeneratedApng(url);
     } catch (err) {
       console.error("Error generating APNG:", err);
@@ -349,34 +321,36 @@ function App() {
 
   return (
     <div className="container">
-      <h1>APNG Creator</h1>
-      <p className="subtitle">Drag, drop, arrange, and animate.</p>
-
+      <header className="header">
+        <h1>APNG Creator</h1>
+        <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
+          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+        </button>
+      </header>
+      
       <div 
         className={`dropzone ${isDraggingFile ? 'active' : ''}`}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onDrop={onDrop}
+        onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
       >
-        <input 
-          type="file" 
-          ref={fileInputRef}
-          className="file-input" 
-          multiple 
-          accept="image/*"
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-        <p>Drop images here or click to upload</p>
+        <Upload size={48} strokeWidth={1.5} className="dropzone-icon" />
+        <div>
+          <h3 style={{margin: '0 0 0.5rem 0', color: 'var(--text-primary)'}}>Drag & drop images here</h3>
+          <p style={{margin: 0, fontSize: '0.9rem'}}>or click to browse files</p>
+        </div>
+        <input type="file" ref={fileInputRef} className="file-input" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
       </div>
 
       {frames.length > 0 && (
         <>
           <div className="controls-bar">
             <div className="control-group">
+              <Clock size={18} />
               <label>Global Delay (ms):</label>
               <input 
                 type="number" 
+                className="frame-delay-input"
+                style={{width: '70px', padding: '0.4rem'}}
                 value={globalDelay} 
                 onChange={(e) => {
                   const val = parseInt(e.target.value) || 0;
@@ -385,28 +359,26 @@ function App() {
                 }} 
               />
             </div>
-            <button className="action-btn" onClick={() => setFrames([])} style={{background: '#ff4444'}}>Clear All</button>
-            <button className="action-btn" onClick={generateAPNG} disabled={isGenerating}>
-              {isGenerating ? 'Generating...' : 'Generate APNG'}
-            </button>
+            
+            <div style={{display: 'flex', gap: '1rem'}}>
+              <button className="btn btn-danger" onClick={handleClearAll}>
+                <Trash2 size={18} /> Clear All
+              </button>
+              <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating}>
+                {isGenerating ? 'Generating...' : <><Play size={18} fill="currentColor" /> Generate APNG</>}
+              </button>
+            </div>
           </div>
 
           <div className="frame-list">
             {frames.map((frame, index) => (
               <div 
-                key={frame.id} 
-                className={`frame-item ${index === 0 ? 'base-frame' : ''} ${draggedFrameId === frame.id ? 'dragging' : ''}`}
-                draggable
-                onDragStart={() => handleSortStart(frame.id)}
-                onDragOver={(e) => handleSortOver(e, frame.id)}
-                onDragEnd={handleSortEnd}
+                key={frame.id} className={`frame-item ${index === 0 ? 'base-frame' : ''} ${draggedFrameId === frame.id ? 'dragging' : ''}`}
+                draggable onDragStart={() => handleSortStart(frame.id)} onDragOver={(e) => handleSortOver(e, frame.id)} onDragEnd={handleSortEnd}
               >
                 {index === 0 && <span className="base-badge">Base</span>}
-                <button 
-                  className="remove-btn"
-                  onClick={() => removeFrame(frame.id)}
-                >
-                  ×
+                <button className="remove-frame-btn" onClick={() => removeFrame(frame.id)} title="Remove Frame">
+                  <X size={14} />
                 </button>
                 
                 <div 
@@ -417,19 +389,23 @@ function App() {
                   <img src={frame.previewUrl} className="frame-preview" alt={`Frame ${index + 1}`} />
                   {index !== 0 && (
                     <div className="edit-overlay">
-                      <span className="edit-btn">Edit</span>
+                      <Move size={24} />
                     </div>
                   )}
                 </div>
 
                 <div className="frame-meta">
                   <span className="frame-index">#{index + 1}</span>
-                  <input 
-                    type="number" 
-                    value={frame.delay} 
-                    onChange={(e) => updateFrameDelay(frame.id, parseInt(e.target.value) || 0)}
-                    title="Frame Delay (ms)"
-                  />
+                  <div className="control-group" style={{gap: '0.4rem'}}>
+                    <Clock size={14} color="var(--text-secondary)" />
+                    <input 
+                      type="number" 
+                      className="frame-delay-input"
+                      value={frame.delay} 
+                      onChange={(e) => updateFrameDelay(frame.id, parseInt(e.target.value) || 0)}
+                      title="Frame Delay (ms)"
+                    />
+                  </div>
                 </div>
               </div>
             ))}
@@ -438,27 +414,22 @@ function App() {
       )}
 
       {editingFrame && (
-        <EditModal 
-          frame={frames.find(f => f.id === editingFrame)!}
-          baseWidth={frames[0].width}
-          baseHeight={frames[0].height}
-          onSave={saveFrameOffset}
-          onClose={() => setEditingFrame(null)}
-        />
+        <EditModal frame={frames.find(f => f.id === editingFrame)!} baseWidth={frames[0].width} baseHeight={frames[0].height} onSave={saveFrameOffset} onClose={() => setEditingFrame(null)} />
       )}
 
       {generatedApng && (
         <div className="result-section">
-          <h2>🎉 Result Ready!</h2>
+          <h2 style={{color: 'var(--text-primary)', marginBottom: '1.5rem'}}>🎉 Result Ready!</h2>
           <img src={generatedApng} className="result-preview" alt="Generated APNG" />
           <br />
-          <a href={generatedApng} download="animation.png">
-            <button className="action-btn download-btn">Download APNG</button>
+          <a href={generatedApng} download="animation.png" style={{textDecoration: 'none'}}>
+            <button className="btn btn-primary" style={{marginTop: '2rem', padding: '0.8rem 2rem', fontSize: '1.1rem'}}>
+              <Download size={20} /> Download APNG
+            </button>
           </a>
         </div>
       )}
     </div>
   );
 }
-
 export default App;
