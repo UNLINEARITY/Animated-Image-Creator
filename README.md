@@ -2,6 +2,9 @@
 
 A powerful, client-side web application to create **Animated PNG (APNG)** and **Animated WebP** files from static images.
 
+<p align='center'><img src='src\images\pre.png' width=95%></p> 
+
+
 ## Features
 
 - **Multi-Format Support**: Export both **APNG** (High quality) and **WebP** (Efficient compression).
