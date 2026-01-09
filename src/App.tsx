@@ -16,7 +16,7 @@ interface Frame {
   offsetX: number;
   offsetY: number;
   scale: number;
-  rotation: number; // Added rotation
+  rotation: number;
 }
 
 interface EditModalProps {
@@ -39,10 +39,24 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [viewScale, setViewScale] = useState(1);
 
-  // Lock body scroll
   useEffect(() => {
     document.body.classList.add('modal-open');
     return () => document.body.classList.remove('modal-open');
+  }, []);
+
+  // Fix: Passive event listener for Wheel
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      setScale(prev => {
+        const delta = -e.deltaY * 0.001 * prev;
+        return Math.max(0.01, Math.min(20, prev + delta));
+      });
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
   }, []);
 
   useEffect(() => {
@@ -55,7 +69,7 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
       if (!wrapperRef.current) return;
       const { clientWidth, clientHeight } = wrapperRef.current;
       setCanvasSize({ width: clientWidth, height: clientHeight });
-      const padding = 100;
+      const padding = 40;
       const fitScale = Math.min((clientWidth - padding) / baseWidth, (clientHeight - padding) / baseHeight);
       setViewScale(fitScale > 0 ? fitScale : 1);
     };
@@ -70,17 +84,12 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // High DPI Support
     const dpr = window.devicePixelRatio || 1;
-    // Set actual size in memory (scaled to account for extra pixel density)
     if (canvas.width !== canvasSize.width * dpr || canvas.height !== canvasSize.height * dpr) {
       canvas.width = canvasSize.width * dpr;
       canvas.height = canvasSize.height * dpr;
-      // Normalize coordinate system to use css pixels
       ctx.scale(dpr, dpr);
     }
-
-    // Set visual size
     canvas.style.width = `${canvasSize.width}px`;
     canvas.style.height = `${canvasSize.height}px`;
 
@@ -97,7 +106,6 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 
     ctx.clearRect(0, 0, cw, ch);
 
-    // 1. Draw Checkerboard Background
     const gridSize = 15;
     for (let y = 0; y < ch; y += gridSize) {
       for (let x = 0; x < cw; x += gridSize) {
@@ -106,24 +114,15 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
       }
     }
 
-    // 2. Draw the User Image with Transformations
     ctx.save();
-    
-    // Calculate center position of the image on canvas
-    // Canvas Center + Offset * viewScale
     const cx = (cw / 2) + (offset.x * viewScale);
     const cy = (ch / 2) + (offset.y * viewScale);
-
     ctx.translate(cx, cy);
     ctx.rotate((rotation * Math.PI) / 180);
     ctx.scale(scale * viewScale, scale * viewScale);
-    
-    // Draw image centered at origin (0,0)
     ctx.drawImage(imageBitmap, -imageBitmap.width / 2, -imageBitmap.height / 2);
-    
     ctx.restore();
 
-    // 3. Draw "Dim Overlay"
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, cw, ch);
@@ -132,12 +131,10 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     ctx.fill('evenodd');
     ctx.restore();
 
-    // 4. Border
     ctx.strokeStyle = '#4c6ef5';
     ctx.lineWidth = 2;
     ctx.strokeRect(baseRectX, baseRectY, baseRectW, baseRectH);
 
-    // 5. Guidelines
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
     ctx.beginPath();
     ctx.moveTo(cw / 2, baseRectY); ctx.lineTo(cw / 2, baseRectY + baseRectH);
@@ -163,12 +160,6 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 
   const handleMouseUp = () => setIsDragging(false);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault(); 
-    const delta = -e.deltaY * 0.001 * scale;
-    setScale(prev => Math.max(0.01, Math.min(20, prev + delta)));
-  };
-
   const handleReset = () => { setOffset({ x: 0, y: 0 }); setScale(1); setRotation(0); };
 
   const adjustScale = (amount: number) => setScale(prev => Math.max(0.01, Math.min(20, parseFloat((prev + amount).toFixed(2)))));
@@ -190,12 +181,10 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
             onMouseMove={handleMouseMove}
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
-            onWheel={handleWheel}
           />
         </div>
 
         <div className="modal-footer">
-          {/* Zoom Control */}
           <div className="control-row">
             <div className="slider-group">
               <ZoomIn size={18} />
@@ -212,7 +201,6 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
               <span className="value-badge">{(scale * 100).toFixed(0)}%</span>
             </div>
 
-            {/* Rotation Control */}
             <div className="slider-group">
               <RefreshCw size={18} />
               <label>Rotate</label>
@@ -336,22 +324,12 @@ function App() {
 
         ctx.clearRect(0, 0, width, height);
         ctx.save();
-        
-        // Transform
-        // 1. Translate to image center position
         const cx = (width / 2) + frame.offsetX;
         const cy = (height / 2) + frame.offsetY;
         ctx.translate(cx, cy);
-        
-        // 2. Rotate
         ctx.rotate((rotation * Math.PI) / 180);
-        
-        // 3. Scale
         ctx.scale(scale, scale);
-        
-        // 4. Draw image centered
         ctx.drawImage(img, -img.width / 2, -img.height / 2);
-        
         ctx.restore();
         
         const imageData = ctx.getImageData(0, 0, width, height);
