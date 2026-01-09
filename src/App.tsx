@@ -445,7 +445,13 @@ function App() {
   return (
     <div className="container">
       <header className="header">
-        <h1>Animated Image Creator</h1>
+        <div className="header-titles">
+          <h1>Animated Image Creator</h1>
+          <p className="header-subtitle">
+            Professional client-side tool to convert static images (PNG, JPG, WebP) 
+            into high-quality APNG & WebP animations.
+          </p>
+        </div>
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
           {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
         </button>
@@ -542,7 +548,7 @@ function App() {
                 </div>
                 <div className="frame-details">
                   <span>{frame.width}·{frame.height}</span>
-                  <span>{frame.fileType}&nbsp;&nbsp;{formatSize(frame.fileSize)}</span>
+                  <span>{frame.fileType}&nbsp;{formatSize(frame.fileSize)}</span>
                 </div>
               </div>
             ))}
