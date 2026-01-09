@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from
 import UPNG from 'upng-js';
 import { 
   Upload, Trash2, Clock, Download, Sun, Moon, 
-  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo, FilePenLine
+  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo, FilePenLine, Github
 } from 'lucide-react';
 import './App.css';
 import { assembleWebP } from './utils/webp-assembler';
@@ -452,9 +452,20 @@ function App() {
             into high-quality APNG & WebP animations.
           </p>
         </div>
-        <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
-          {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
-        </button>
+        <div className="header-actions">
+          <a 
+            href="https://github.com/UNLINEARITY/Animated-Image-Creator" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="header-icon-link"
+            title="View on GitHub"
+          >
+            <Github size={20} />
+          </a>
+          <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
+            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          </button>
+        </div>
       </header>
       
       <div 
