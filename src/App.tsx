@@ -2,7 +2,7 @@ import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from
 import UPNG from 'upng-js';
 import { 
   Upload, Trash2, Clock, Download, Sun, Moon, 
-  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw
+  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2
 } from 'lucide-react';
 import './App.css';
 
@@ -44,7 +44,6 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
     return () => document.body.classList.remove('modal-open');
   }, []);
 
-  // Fix: Passive event listener for Wheel
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -259,12 +258,31 @@ function App() {
         height: bmp.height,
         offsetX: 0,
         offsetY: 0,
-        scale: 1,
+        scale: 1, // Default scale
         rotation: 0
       });
     }
     setFrames(prev => [...prev, ...newFramesData]);
   }, [globalDelay]);
+
+  const handleSmartAlign = () => {
+    if (frames.length < 2) return;
+    const baseW = frames[0].width;
+    const baseH = frames[0].height;
+
+    setFrames(prev => prev.map((frame, index) => {
+      if (index === 0) return frame; // Skip base
+
+      // Smart Fit: "Cover" logic
+      // Scale image so it fills the base dimensions completely (no black bars)
+      // This handles both upscaling (if image is small) and downscaling.
+      const scaleX = baseW / frame.width;
+      const scaleY = baseH / frame.height;
+      const newScale = Math.max(scaleX, scaleY);
+      
+      return { ...frame, scale: parseFloat(newScale.toFixed(4)) };
+    }));
+  };
 
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); };
@@ -392,6 +410,11 @@ function App() {
               <button className="btn btn-danger" onClick={handleClearAll}>
                 <Trash2 size={18} /> Clear All
               </button>
+              
+              <button className="btn btn-secondary" onClick={handleSmartAlign} title="Auto fit larger images to base frame">
+                <Wand2 size={18} /> Smart Align
+              </button>
+
               <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating}>
                 {isGenerating ? 'Generating...' : <><Play size={18} fill="currentColor" /> Generate APNG</>}
               </button>
