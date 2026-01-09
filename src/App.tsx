@@ -2,9 +2,10 @@ import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from
 import UPNG from 'upng-js';
 import { 
   Upload, Trash2, Clock, Download, Sun, Moon, 
-  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2
+  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo
 } from 'lucide-react';
 import './App.css';
+import { assembleWebP } from './utils/webp-assembler';
 
 interface Frame {
   id: string;
@@ -233,6 +234,7 @@ function App() {
   const [isDraggingFile, setIsDraggingFile] = useState(false);
   const [globalDelay, setGlobalDelay] = useState(100);
   const [generatedApng, setGeneratedApng] = useState<string | null>(null);
+  const [generatedWebP, setGeneratedWebP] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [editingFrame, setEditingFrame] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -275,7 +277,6 @@ function App() {
 
       // Smart Fit: "Cover" logic
       // Scale image so it fills the base dimensions completely (no black bars)
-      // This handles both upscaling (if image is small) and downscaling.
       const scaleX = baseW / frame.width;
       const scaleY = baseH / frame.height;
       const newScale = Math.max(scaleX, scaleY);
@@ -287,7 +288,7 @@ function App() {
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); };
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); handleFiles(e.dataTransfer.files); };
-  const handleClearAll = () => { setFrames([]); setGeneratedApng(null); };
+  const handleClearAll = () => { setFrames([]); setGeneratedApng(null); setGeneratedWebP(null); };
 
   const removeFrame = (id: string) => {
     setFrames(prev => {
@@ -323,6 +324,7 @@ function App() {
   const generateAPNG = async () => {
     if (frames.length === 0) return;
     setIsGenerating(true);
+    setGeneratedWebP(null); // Clear previous WebP result
     try {
       const imageBitmaps = await Promise.all(frames.map(f => createImageBitmap(f.file)));
       const width = imageBitmaps[0].width;
@@ -360,6 +362,55 @@ function App() {
     } catch (err) {
       console.error("Error generating APNG:", err);
       alert("Error generating APNG. Check console for details.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const generateWebP = async () => {
+    if (frames.length === 0) return;
+    setIsGenerating(true);
+    setGeneratedApng(null); // Clear previous APNG result
+    try {
+      const imageBitmaps = await Promise.all(frames.map(f => createImageBitmap(f.file)));
+      const width = imageBitmaps[0].width;
+      const height = imageBitmaps[0].height;
+      const webpFrames: { image: Blob; duration: number }[] = [];
+      
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error("Could not get canvas context");
+
+      for (let i = 0; i < frames.length; i++) {
+        const img = imageBitmaps[i];
+        const frame = frames[i];
+        const scale = frame.scale || 1;
+        const rotation = frame.rotation || 0;
+
+        ctx.clearRect(0, 0, width, height);
+        ctx.save();
+        const cx = (width / 2) + frame.offsetX;
+        const cy = (height / 2) + frame.offsetY;
+        ctx.translate(cx, cy);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.scale(scale, scale);
+        ctx.drawImage(img, -img.width / 2, -img.height / 2);
+        ctx.restore();
+        
+        // Export frame as WebP Blob
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', 0.9));
+        if (blob) {
+            webpFrames.push({ image: blob, duration: frame.delay });
+        }
+      }
+      
+      const finalBlob = await assembleWebP(webpFrames, width, height);
+      const url = URL.createObjectURL(finalBlob);
+      setGeneratedWebP(url);
+    } catch (err) {
+      console.error("Error generating WebP:", err);
+      alert("Error generating WebP. Check console.");
     } finally {
       setIsGenerating(false);
     }
@@ -415,9 +466,14 @@ function App() {
                 <Wand2 size={18} /> Smart Align
               </button>
 
-              <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating}>
-                {isGenerating ? 'Generating...' : <><Play size={18} fill="currentColor" /> Generate APNG</>}
-              </button>
+              <div style={{display: 'flex', gap: '0.5rem'}}>
+                <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating} title="Generate APNG File">
+                  {isGenerating ? '...' : <><Play size={18} fill="currentColor" /> APNG</>}
+                </button>
+                <button className="btn btn-primary" onClick={generateWebP} disabled={isGenerating} title="Generate WebP File">
+                  {isGenerating ? '...' : <><FileVideo size={18} /> WebP</>}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -468,14 +524,16 @@ function App() {
         <EditModal frame={frames.find(f => f.id === editingFrame)!} baseWidth={frames[0].width} baseHeight={frames[0].height} onSave={saveFrameOffset} onClose={() => setEditingFrame(null)} />
       )}
 
-      {generatedApng && (
+      {(generatedApng || generatedWebP) && (
         <div className="result-section">
-          <h2 style={{color: 'var(--text-primary)', marginBottom: '1.5rem'}}>🎉 Result Ready!</h2>
-          <img src={generatedApng} className="result-preview" alt="Generated APNG" />
+          <h2 style={{color: 'var(--text-primary)', marginBottom: '1.5rem'}}>
+            🎉 {generatedApng ? 'APNG' : 'WebP'} Ready!
+          </h2>
+          <img src={generatedApng || generatedWebP!} className="result-preview" alt="Generated Animation" />
           <br />
-          <a href={generatedApng} download="animation.png" style={{textDecoration: 'none'}}>
+          <a href={generatedApng || generatedWebP!} download={generatedApng ? "animation.png" : "animation.webp"} style={{textDecoration: 'none'}}>
             <button className="btn btn-primary" style={{marginTop: '2rem', padding: '0.8rem 2rem', fontSize: '1.1rem'}}>
-              <Download size={20} /> Download APNG
+              <Download size={20} /> Download {generatedApng ? 'APNG' : 'WebP'}
             </button>
           </a>
         </div>
