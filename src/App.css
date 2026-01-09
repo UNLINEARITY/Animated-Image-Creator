@@ -303,6 +303,18 @@ h1 {
   align-items: center;
 }
 
+.frame-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  margin-top: 0.5rem;
+  opacity: 0.8;
+  font-family: monospace;
+  padding-top: 0.4rem;
+  border-top: 1px dashed var(--border-color);
+}
+
 .frame-index {
   font-size: 0.8rem;
   color: var(--text-secondary);

@@ -2,10 +2,18 @@ import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from
 import UPNG from 'upng-js';
 import { 
   Upload, Trash2, Clock, Download, Sun, Moon, 
-  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo
+  Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo, FilePenLine
 } from 'lucide-react';
 import './App.css';
 import { assembleWebP } from './utils/webp-assembler';
+
+const formatSize = (bytes: number) => {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
 
 interface Frame {
   id: string;
@@ -18,6 +26,8 @@ interface Frame {
   offsetY: number;
   scale: number;
   rotation: number;
+  fileSize: number;
+  fileType: string;
 }
 
 interface EditModalProps {
@@ -240,6 +250,10 @@ function App() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  
+  // New States
+  const [exportFileName, setExportFileName] = useState("animation");
+  const [resultSize, setResultSize] = useState<string | null>(null);
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -261,7 +275,9 @@ function App() {
         offsetX: 0,
         offsetY: 0,
         scale: 1, // Default scale
-        rotation: 0
+        rotation: 0,
+        fileSize: file.size,
+        fileType: file.type.split('/')[1].toUpperCase().replace('JPEG', 'JPG')
       });
     }
     setFrames(prev => [...prev, ...newFramesData]);
@@ -288,7 +304,13 @@ function App() {
   const onDragOver = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(true); };
   const onDragLeave = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); };
   const onDrop = (e: React.DragEvent) => { e.preventDefault(); setIsDraggingFile(false); handleFiles(e.dataTransfer.files); };
-  const handleClearAll = () => { setFrames([]); setGeneratedApng(null); setGeneratedWebP(null); };
+  const handleClearAll = () => { 
+    setFrames([]); 
+    setGeneratedApng(null); 
+    setGeneratedWebP(null); 
+    setResultSize(null);
+    setExportFileName("animation");
+  };
 
   const removeFrame = (id: string) => {
     setFrames(prev => {
@@ -325,6 +347,7 @@ function App() {
     if (frames.length === 0) return;
     setIsGenerating(true);
     setGeneratedWebP(null); // Clear previous WebP result
+    setResultSize(null);
     try {
       const imageBitmaps = await Promise.all(frames.map(f => createImageBitmap(f.file)));
       const width = imageBitmaps[0].width;
@@ -357,6 +380,7 @@ function App() {
       }
       const apngBuffer = UPNG.encode(buffers, width, height, 0, delays);
       const blob = new Blob([apngBuffer], { type: 'image/png' });
+      setResultSize(formatSize(blob.size));
       const url = URL.createObjectURL(blob);
       setGeneratedApng(url);
     } catch (err) {
@@ -371,6 +395,7 @@ function App() {
     if (frames.length === 0) return;
     setIsGenerating(true);
     setGeneratedApng(null); // Clear previous APNG result
+    setResultSize(null);
     try {
       const imageBitmaps = await Promise.all(frames.map(f => createImageBitmap(f.file)));
       const width = imageBitmaps[0].width;
@@ -406,6 +431,7 @@ function App() {
       }
       
       const finalBlob = await assembleWebP(webpFrames, width, height);
+      setResultSize(formatSize(finalBlob.size));
       const url = URL.createObjectURL(finalBlob);
       setGeneratedWebP(url);
     } catch (err) {
@@ -514,6 +540,10 @@ function App() {
                     />
                   </div>
                 </div>
+                <div className="frame-details">
+                  <span>{frame.width}·{frame.height}</span>
+                  <span>{frame.fileType}&nbsp;&nbsp;{formatSize(frame.fileSize)}</span>
+                </div>
               </div>
             ))}
           </div>
@@ -526,16 +556,47 @@ function App() {
 
       {(generatedApng || generatedWebP) && (
         <div className="result-section">
-          <h2 style={{color: 'var(--text-primary)', marginBottom: '1.5rem'}}>
+          <h2 style={{color: 'var(--text-primary)', marginBottom: '1rem'}}>
             🎉 {generatedApng ? 'APNG' : 'WebP'} Ready!
           </h2>
+          
           <img src={generatedApng || generatedWebP!} className="result-preview" alt="Generated Animation" />
-          <br />
-          <a href={generatedApng || generatedWebP!} download={generatedApng ? "animation.png" : "animation.webp"} style={{textDecoration: 'none'}}>
-            <button className="btn btn-primary" style={{marginTop: '2rem', padding: '0.8rem 2rem', fontSize: '1.1rem'}}>
-              <Download size={20} /> Download {generatedApng ? 'APNG' : 'WebP'}
-            </button>
-          </a>
+          
+          <div className="result-controls" style={{marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center'}}>
+            {resultSize && (
+               <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '4px 12px', borderRadius: '12px', border: '1px solid var(--border-color)'}}>
+                 Size: {resultSize}
+               </span>
+            )}
+
+            <div className="filename-input-group" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                <FilePenLine size={18} color="var(--text-secondary)" />
+                <input 
+                  type="text" 
+                  value={exportFileName} 
+                  onChange={(e) => setExportFileName(e.target.value)}
+                  className="file-input-text"
+                  style={{
+                    background: 'transparent', 
+                    border: 'none', 
+                    borderBottom: '1px solid var(--border-color)', 
+                    color: 'var(--text-primary)',
+                    padding: '4px',
+                    fontSize: '1rem',
+                    textAlign: 'center',
+                    outline: 'none',
+                    minWidth: '150px'
+                  }}
+                />
+                <span style={{color: 'var(--text-secondary)'}}>.{generatedApng ? 'png' : 'webp'}</span>
+            </div>
+
+            <a href={generatedApng || generatedWebP!} download={`${exportFileName}.${generatedApng ? 'png' : 'webp'}`} style={{textDecoration: 'none'}}>
+              <button className="btn btn-primary" style={{padding: '0.8rem 2rem', fontSize: '1.1rem'}}>
+                <Download size={20} /> Download
+              </button>
+            </a>
+          </div>
         </div>
       )}
     </div>
