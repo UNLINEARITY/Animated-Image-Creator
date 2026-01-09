@@ -1,121 +1,404 @@
+/* ... (Keep existing styles up to Modal section) ... */
 .container {
-  max-width: 1200px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 2rem;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+h1 {
   text-align: center;
+  background: linear-gradient(to right, #646cff, #9089fc);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  margin-bottom: 0.5rem;
+}
+
+.subtitle {
+  text-align: center;
+  color: #888;
+  margin-bottom: 2rem;
 }
 
 .dropzone {
-  border: 2px dashed #646cff;
-  border-radius: 12px;
+  border: 2px dashed #444;
+  border-radius: 16px;
   padding: 3rem;
-  margin: 2rem 0;
-  background-color: rgba(100, 108, 255, 0.1);
+  text-align: center;
+  background-color: #1e1e1e;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .dropzone:hover, .dropzone.active {
-  background-color: rgba(100, 108, 255, 0.2);
-  transform: scale(1.01);
+  border-color: #646cff;
+  background-color: rgba(100, 108, 255, 0.05);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.2);
 }
 
 .file-input {
   display: none;
 }
 
-.controls {
-  margin: 2rem 0;
+.controls-bar {
+  background: #2a2a2a;
+  padding: 1rem 2rem;
+  border-radius: 12px;
   display: flex;
-  justify-content: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  gap: 2rem;
   align-items: center;
+  justify-content: center;
+  margin: 2rem 0;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+}
+
+.control-group label {
+  font-weight: 500;
+  color: #ccc;
 }
 
 .frame-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1.5rem;
   margin: 2rem 0;
+  padding: 0.5rem;
 }
 
 .frame-item {
-  background: #1a1a1a;
-  border-radius: 8px;
-  padding: 1rem;
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 12px;
+  padding: 0.8rem;
   position: relative;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: grab;
+}
+
+.frame-item:active {
+  cursor: grabbing;
+}
+
+.frame-item.dragging {
+  opacity: 0.5;
+  border: 2px dashed #646cff;
+}
+
+.frame-item.base-frame {
+  border-color: #646cff;
+  background: rgba(100, 108, 255, 0.05);
+}
+
+.base-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #646cff;
+  color: white;
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: bold;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+.frame-preview-container {
+  width: 100%;
+  aspect-ratio: 1;
+  background: #252525;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 0.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.edit-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.2s;
+  cursor: pointer;
+}
+
+.frame-preview-container:hover .edit-overlay {
+  opacity: 1;
+}
+
+.edit-btn {
+  background: #fff;
+  color: #000;
+  border: none;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: bold;
+  pointer-events: none;
 }
 
 .frame-preview {
-  width: 100px;
-  height: 100px;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
-  background: #333; /* Checkerboard pattern could go here */
-  border-radius: 4px;
-  margin-bottom: 0.5rem;
 }
 
-.frame-controls {
+.frame-meta {
   display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
 }
 
-.frame-number {
-  position: absolute;
-  top: 5px;
-  left: 5px;
-  background: rgba(0,0,0,0.7);
-  color: white;
-  padding: 2px 6px;
-  border-radius: 4px;
+.frame-index {
   font-size: 0.8rem;
+  color: #666;
+  font-weight: 600;
 }
 
 .remove-btn {
   position: absolute;
-  top: -10px;
-  right: -10px;
-  background: #ff4444;
-  color: white;
-  border: none;
-  border-radius: 50%;
+  top: -8px;
+  right: -8px;
   width: 24px;
   height: 24px;
-  cursor: pointer;
+  border-radius: 50%;
+  background: #ff4444;
+  color: white;
+  border: 2px solid #1a1a1a;
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: pointer;
   padding: 0;
-  line-height: 1;
+  transition: transform 0.2s;
+  z-index: 5;
 }
 
-.preview-section {
+.remove-btn:hover {
+  transform: scale(1.1);
+  background: #ff2222;
+}
+
+/* --- Improved Modal Styles --- */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(5px);
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-content {
+  background: #1a1a1a;
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 95vw;          /* Wider to use more screen space */
+  max-width: 1200px;    /* Max limit */
+  height: 90vh;         /* Taller */
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #333;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  color: #fff;
+}
+
+.close-modal-btn {
+  background: none;
+  border: none;
+  color: #888;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.close-modal-btn:hover {
+  color: #fff;
+}
+
+.canvas-wrapper {
+  flex: 1; /* Take up all remaining vertical space */
+  background: #0f0f0f;
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  /* Checkerboard pattern */
+  background-image: 
+    linear-gradient(45deg, #222 25%, transparent 25%), 
+    linear-gradient(-45deg, #222 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #222 75%), 
+    linear-gradient(-45deg, transparent 75%, #222 75%);
+  background-size: 20px 20px;
+  display: flex;           /* Ensures canvas can be centered if smaller, or fill if needed */
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-container {
+  display: block;
+  cursor: grab;
+  /* No fixed width/height here, controlled by JS */
+}
+
+.canvas-container:active {
+  cursor: grabbing;
+}
+
+.modal-footer {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #333;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  flex-shrink: 0;
+}
+
+.slider-group {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: #ccc;
+}
+
+.slider-group input[type="range"] {
+  flex: 1;
+  height: 4px;
+  background: #444;
+  border-radius: 2px;
+  appearance: none;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #646cff;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: transform 0.1s;
+}
+
+.slider-group input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.button-group {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+/* Result Section */
+.result-section {
+  background: #1e1e1e;
+  border-radius: 16px;
+  padding: 2rem;
   margin-top: 3rem;
-  border-top: 1px solid #444;
-  padding-top: 2rem;
+  border: 1px solid #333;
+  text-align: center;
+  animation: fadeIn 0.5s ease;
 }
 
 .result-preview {
   max-width: 100%;
+  height: auto;
   max-height: 500px;
-  border: 1px solid #444;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
   background-image: 
-    linear-gradient(45deg, #333 25%, transparent 25%), 
-    linear-gradient(-45deg, #333 25%, transparent 25%), 
-    linear-gradient(45deg, transparent 75%, #333 75%), 
-    linear-gradient(-45deg, transparent 75%, #333 75%);
+    linear-gradient(45deg, #2a2a2a 25%, transparent 25%), 
+    linear-gradient(-45deg, #2a2a2a 25%, transparent 25%), 
+    linear-gradient(45deg, transparent 75%, #2a2a2a 75%), 
+    linear-gradient(-45deg, transparent 75%, #2a2a2a 75%);
   background-size: 20px 20px;
-  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+}
+
+.action-btn {
+  background: #646cff;
+  color: white;
+  font-weight: 600;
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.secondary {
+  background: #333;
+  color: #eee;
+}
+
+.action-btn:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.action-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.download-btn {
+  background: #42b883;
+  margin-top: 1.5rem;
+  padding: 1rem 2rem;
+  font-size: 1.1rem;
 }
 
 input[type="number"] {
-  padding: 0.4em;
-  border-radius: 4px;
-  border: 1px solid #555;
-  background: #2a2a2a;
+  background: #333;
+  border: 1px solid #444;
   color: white;
-  width: 60px;
+  padding: 0.4rem;
+  border-radius: 4px;
+  width: 70px;
+  text-align: center;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
