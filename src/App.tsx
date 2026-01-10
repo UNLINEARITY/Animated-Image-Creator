@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import UPNG from 'upng-js';
-import { 
-  Upload, Trash2, Clock, Download, Sun, Moon, 
+import {
+  Upload, Trash2, Clock, Download, Sun, Moon,
   Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo, FilePenLine, Github
 } from 'lucide-react';
 import './App.css';
@@ -254,6 +254,8 @@ function App() {
   // New States
   const [exportFileName, setExportFileName] = useState("animation");
   const [resultSize, setResultSize] = useState<string | null>(null);
+  const [apngCompression, setApngCompression] = useState(0);
+  const [webpQuality, setWebpQuality] = useState(0.9);
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -435,7 +437,7 @@ function App() {
         const imageData = ctx.getImageData(0, 0, width, height);
         buffers.push(imageData.data.buffer);
       }
-      const apngBuffer = UPNG.encode(buffers, width, height, 0, delays);
+      const apngBuffer = UPNG.encode(buffers, width, height, apngCompression, delays);
       const blob = new Blob([apngBuffer], { type: 'image/png' });
       setResultSize(formatSize(blob.size));
       const url = URL.createObjectURL(blob);
@@ -481,7 +483,7 @@ function App() {
         ctx.restore();
         
         // Export frame as WebP Blob
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', 0.9));
+        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', webpQuality));
         if (blob) {
             webpFrames.push({ image: blob, duration: frame.delay });
         }
@@ -561,7 +563,7 @@ function App() {
               <button className="btn btn-danger" onClick={handleClearAll}>
                 <Trash2 size={18} /> Clear All
               </button>
-              
+
               <button className="btn btn-secondary" onClick={handleSmartAlign} title="Auto fit larger images to base frame">
                 <Wand2 size={18} /> Smart Align
               </button>
@@ -633,9 +635,9 @@ function App() {
           <h2 style={{color: 'var(--text-primary)', marginBottom: '1rem'}}>
             🎉 {generatedApng ? 'APNG' : 'WebP'} Ready!
           </h2>
-          
+
           <img src={generatedApng || generatedWebP!} className="result-preview" alt="Generated Animation" />
-          
+
           <div className="result-controls" style={{marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center'}}>
             {resultSize && (
                <span style={{fontSize: '0.9rem', color: 'var(--text-secondary)', background: 'var(--bg-secondary)', padding: '4px 12px', borderRadius: '12px', border: '1px solid var(--border-color)'}}>
@@ -643,17 +645,73 @@ function App() {
                </span>
             )}
 
+            <div style={{width: '100%', maxWidth: '400px'}}>
+              {generatedApng ? (
+                <div>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', marginBottom: '0.5rem'}}>
+                    <label style={{fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap'}}>APNG Compression:</label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="9"
+                      step="1"
+                      value={apngCompression}
+                      onChange={(e) => setApngCompression(parseInt(e.target.value))}
+                      style={{flex: 1}}
+                    />
+                    <span style={{fontSize: '0.875rem', color: 'var(--text-primary)', minWidth: '32px'}}>
+                      {apngCompression}
+                    </span>
+                  </div>
+                  <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center'}}>
+                    <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating} title="Re-generate APNG">
+                      {isGenerating ? '...' : <>↻ APNG</>}
+                    </button>
+                    <button className="btn btn-secondary" onClick={generateWebP} disabled={isGenerating} title="Generate WebP instead">
+                      {isGenerating ? '...' : <><FileVideo size={18} /> WebP</>}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.5rem', background: 'var(--bg-secondary)', border: '1px solid var(--border-color)', borderRadius: '8px', marginBottom: '0.5rem'}}>
+                    <label style={{fontSize: '0.875rem', color: 'var(--text-secondary)', whiteSpace: 'nowrap'}}>WebP Quality:</label>
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="1.0"
+                      step="0.05"
+                      value={webpQuality}
+                      onChange={(e) => setWebpQuality(parseFloat(e.target.value))}
+                      style={{flex: 1}}
+                    />
+                    <span style={{fontSize: '0.875rem', color: 'var(--text-primary)', minWidth: '32px'}}>
+                      {Math.round(webpQuality * 100)}%
+                    </span>
+                  </div>
+                  <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center'}}>
+                    <button className="btn btn-primary" onClick={generateWebP} disabled={isGenerating} title="Re-generate WebP">
+                      {isGenerating ? '...' : <>↻ WebP</>}
+                    </button>
+                    <button className="btn btn-secondary" onClick={generateAPNG} disabled={isGenerating} title="Generate APNG instead">
+                      {isGenerating ? '...' : <><Play size={18} fill="currentColor" /> APNG</>}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <div className="filename-input-group" style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
                 <FilePenLine size={18} color="var(--text-secondary)" />
-                <input 
-                  type="text" 
-                  value={exportFileName} 
+                <input
+                  type="text"
+                  value={exportFileName}
                   onChange={(e) => setExportFileName(e.target.value)}
                   className="file-input-text"
                   style={{
-                    background: 'transparent', 
-                    border: 'none', 
-                    borderBottom: '1px solid var(--border-color)', 
+                    background: 'transparent',
+                    border: 'none',
+                    borderBottom: '1px solid var(--border-color)',
                     color: 'var(--text-primary)',
                     padding: '4px',
                     fontSize: '1rem',
