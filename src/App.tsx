@@ -15,6 +15,96 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Helper function to detect if a PNG file is animated
+async function isAnimatedPNG(file: File): Promise<boolean> {
+  const buffer = await file.arrayBuffer();
+  const dataView = new DataView(buffer);
+
+  // Check PNG signature
+  if (dataView.getUint32(0) !== 0x89504E47 || // .PNG
+      dataView.getUint32(4) !== 0x0D0A1A0A) { // ^Z\n (DOS EOF)
+    return false;
+  }
+
+  // Search for acTL chunk (animation control chunk)
+  // acTL must appear before IDAT
+  const maxSearchLength = Math.min(buffer.byteLength, 10000);
+  let i = 8; // Start after PNG signature
+
+  while (i < maxSearchLength - 8) {
+    const chunkLength = dataView.getUint32(i);
+    const chunkType = dataView.getUint32(i + 4);
+
+    if (chunkType === 0x6163544C) { // "acTL" in big-endian hex
+      console.log('Found acTL chunk - this is an animated PNG!');
+      return true;
+    }
+    if (chunkType === 0x49444154) { // "IDAT" - reached image data without finding acTL
+      console.log('Found IDAT chunk without acTL - this is a static PNG');
+      return false;
+    }
+
+    // Skip to next chunk: length(4) + type(4) + data + crc(4)
+    i += 12 + chunkLength;
+  }
+
+  return false;
+}
+
+// Helper function to parse APNG file and extract frames
+async function parseAPNG(file: File): Promise<Frame[]> {
+  const buffer = await file.arrayBuffer();
+  const decoded = UPNG.decode(buffer);
+
+  if (!decoded.frames || decoded.frames.length === 0) {
+    throw new Error('Not a valid animated PNG');
+  }
+
+  const frameData = UPNG.toRGBA8(decoded);
+  const frames: Frame[] = [];
+
+  for (let i = 0; i < frameData.length; i++) {
+    // Convert RGBA data to canvas then to blob
+    const canvas = document.createElement('canvas');
+    canvas.width = decoded.width;
+    canvas.height = decoded.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Could not get canvas context');
+
+    const imageData = new ImageData(
+      new Uint8ClampedArray(frameData[i]),
+      decoded.width,
+      decoded.height
+    );
+    ctx.putImageData(imageData, 0, 0);
+
+    const blob: Blob | null = await new Promise((resolve) => {
+      canvas.toBlob(resolve, 'image/png');
+    });
+
+    if (!blob) throw new Error(`Failed to create blob for frame ${i}`);
+
+    const frameFile = new File([blob], `frame_${i}.png`, { type: 'image/png' });
+
+    frames.push({
+      id: Math.random().toString(36).substr(2, 9),
+      file: frameFile,
+      previewUrl: URL.createObjectURL(blob),
+      delay: decoded.frames[i]?.delay || 100,
+      width: decoded.width,
+      height: decoded.height,
+      offsetX: 0,
+      offsetY: 0,
+      scale: 1,
+      rotation: 0,
+      fileSize: blob.size,
+      fileType: 'PNG'
+    });
+  }
+
+  return frames;
+}
+
 interface Frame {
   id: string;
   file: File;
@@ -263,25 +353,46 @@ function App() {
   const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
     const newFramesData: Frame[] = [];
+
     for (let i = 0; i < fileList.length; i++) {
       const file = fileList[i];
-      if (!file.type.startsWith('image/')) continue;
-      const bmp = await createImageBitmap(file);
-      newFramesData.push({
-        id: Math.random().toString(36).substr(2, 9),
-        file,
-        previewUrl: URL.createObjectURL(file),
-        delay: globalDelay,
-        width: bmp.width,
-        height: bmp.height,
-        offsetX: 0,
-        offsetY: 0,
-        scale: 1, // Default scale
-        rotation: 0,
-        fileSize: file.size,
-        fileType: file.type.split('/')[1].toUpperCase().replace('JPEG', 'JPG')
-      });
+
+      try {
+        // Check for APNG files first - by extension or by detecting acTL chunk
+        const isAPNG = file.name.toLowerCase().endsWith('.apng') ||
+                      (file.type === 'image/png' && await isAnimatedPNG(file));
+
+        if (isAPNG) {
+          console.log(`Processing APNG file: ${file.name}`);
+          const apngFrames = await parseAPNG(file);
+          console.log(`Extracted ${apngFrames.length} frames from APNG`);
+          newFramesData.push(...apngFrames);
+          continue; // Skip static image processing for this file
+        }
+
+        // Process regular image files
+        if (!file.type.startsWith('image/')) continue;
+        const bmp = await createImageBitmap(file);
+        newFramesData.push({
+          id: Math.random().toString(36).substr(2, 9),
+          file,
+          previewUrl: URL.createObjectURL(file),
+          delay: globalDelay,
+          width: bmp.width,
+          height: bmp.height,
+          offsetX: 0,
+          offsetY: 0,
+          scale: 1, // Default scale
+          rotation: 0,
+          fileSize: file.size,
+          fileType: file.type.split('/')[1].toUpperCase().replace('JPEG', 'JPG')
+        });
+      } catch (err) {
+        console.error(`Error processing file ${file.name}:`, err);
+        alert(`Error processing ${file.name}: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      }
     }
+
     setFrames(prev => {
       const combined = [...prev, ...newFramesData];
       // Ensure base frame (first frame) always has no transforms applied
@@ -507,8 +618,8 @@ function App() {
         <div className="header-titles">
           <h1>Animated Image Creator</h1>
           <p className="header-subtitle">
-            Professional client-side tool to convert static images (PNG, JPG, WebP) 
-            into high-quality APNG & WebP animations.
+            Professional client-side tool to convert static images and APNG files
+            into high-quality animations. Supports PNG, JPG, WebP, and APNG import.
           </p>
         </div>
         <div className="header-actions">
@@ -527,7 +638,7 @@ function App() {
         </div>
       </header>
       
-      <div 
+      <div
         className={`dropzone ${isDraggingFile ? 'active' : ''}`}
         onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop}
         onClick={() => fileInputRef.current?.click()}
@@ -535,9 +646,9 @@ function App() {
         <Upload size={48} strokeWidth={1.5} className="dropzone-icon" />
         <div>
           <h3 style={{margin: '0 0 0.5rem 0', color: 'var(--text-primary)'}}>Drag & drop images here</h3>
-          <p style={{margin: 0, fontSize: '0.9rem'}}>or click to browse files</p>
+          <p style={{margin: 0, fontSize: '0.9rem'}}>Supports PNG, JPG, WebP, APNG • or click to browse files</p>
         </div>
-        <input type="file" ref={fileInputRef} className="file-input" multiple accept="image/*" onChange={(e) => handleFiles(e.target.files)} />
+        <input type="file" ref={fileInputRef} className="file-input" multiple accept="image/*,.apng,.webp" onChange={(e) => handleFiles(e.target.files)} />
       </div>
 
       {frames.length > 0 && (
