@@ -681,10 +681,10 @@ function App() {
 
               <div style={{display: 'flex', gap: '0.5rem'}}>
                 <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating} title="Generate APNG File">
-                  {isGenerating ? '...' : <><Play size={18} fill="currentColor" /> APNG</>}
+                  {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px'}}></span> : <><Play size={18} fill="currentColor" /> APNG</>}
                 </button>
                 <button className="btn btn-primary" onClick={generateWebP} disabled={isGenerating} title="Generate WebP File">
-                  {isGenerating ? '...' : <><FileVideo size={18} /> WebP</>}
+                  {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px'}}></span> : <><FileVideo size={18} /> WebP</>}
                 </button>
               </div>
             </div>
@@ -692,9 +692,14 @@ function App() {
 
           <div className="frame-list">
             {frames.map((frame, index) => (
-              <div 
-                key={frame.id} className={`frame-item ${index === 0 ? 'base-frame' : ''} ${draggedFrameId === frame.id ? 'dragging' : ''}`}
-                draggable onDragStart={() => handleSortStart(frame.id)} onDragOver={(e) => handleSortOver(e, frame.id)} onDragEnd={handleSortEnd}
+              <div
+                key={frame.id}
+                className={`frame-item ${index === 0 ? 'base-frame' : ''} ${draggedFrameId === frame.id ? 'dragging' : ''}`}
+                draggable
+                onDragStart={() => handleSortStart(frame.id)}
+                onDragOver={(e) => handleSortOver(e, frame.id)}
+                onDragEnd={handleSortEnd}
+                style={{ animationDelay: `${Math.min(index * 0.05, 0.5)}s` }}
               >
                 {index === 0 && <span className="base-badge">Base</span>}
                 <button className="remove-frame-btn" onClick={() => removeFrame(frame.id)} title="Remove Frame">
@@ -776,10 +781,10 @@ function App() {
                   </div>
                   <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center'}}>
                     <button className="btn btn-primary" onClick={generateAPNG} disabled={isGenerating} title="Re-generate APNG">
-                      {isGenerating ? '...' : <>↻ APNG</>}
+                      {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px'}}></span> : <>↻ APNG</>}
                     </button>
                     <button className="btn btn-secondary" onClick={generateWebP} disabled={isGenerating} title="Generate WebP instead">
-                      {isGenerating ? '...' : <><FileVideo size={18} /> WebP</>}
+                      {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px', borderColor: 'var(--text-secondary)', borderTopColor: 'var(--text-primary)'}}></span> : <><FileVideo size={18} /> WebP</>}
                     </button>
                   </div>
                 </div>
@@ -802,10 +807,10 @@ function App() {
                   </div>
                   <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center'}}>
                     <button className="btn btn-primary" onClick={generateWebP} disabled={isGenerating} title="Re-generate WebP">
-                      {isGenerating ? '...' : <>↻ WebP</>}
+                      {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px'}}></span> : <>↻ WebP</>}
                     </button>
                     <button className="btn btn-secondary" onClick={generateAPNG} disabled={isGenerating} title="Generate APNG instead">
-                      {isGenerating ? '...' : <><Play size={18} fill="currentColor" /> APNG</>}
+                      {isGenerating ? <span className="loading-spinner" style={{width: '18px', height: '18px', borderColor: 'var(--text-secondary)', borderTopColor: 'var(--text-primary)'}}></span> : <><Play size={18} fill="currentColor" /> APNG</>}
                     </button>
                   </div>
                 </div>
