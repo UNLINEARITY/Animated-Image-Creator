@@ -28,7 +28,7 @@ function parseWebP(buffer: ArrayBuffer) {
   return chunks;
 }
 
-export async function assembleWebP(frames: { image: Blob; duration: number }[], width: number, height: number): Promise<Blob> {
+export async function assembleWebP(frames: { image: Blob; duration: number }[], width: number, height: number, loopCount: number = 0): Promise<Blob> {
   const parts: Uint8Array[] = [];
 
   // 1. VP8X Chunk (Extended WebP Header)
@@ -48,7 +48,7 @@ export async function assembleWebP(frames: { image: Blob; duration: number }[], 
   // 2. ANIM Chunk (Global Animation Control)
   const animData = new Uint8Array(6);
   animData.set([255, 255, 255, 0], 0); // Background Color (BGRA) - Transparent White
-  animData.set([0, 0], 4); // Loop Count (0 = infinite)
+  animData.set([loopCount & 0xff, (loopCount >> 8) & 0xff], 4); // Loop Count (0 = infinite)
   
   parts.push(new TextEncoder().encode('ANIM'));
   parts.push(uint32(6));
