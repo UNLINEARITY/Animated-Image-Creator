@@ -15,6 +15,64 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Helper function to modify APNG loop count in acTL chunk
+function setAPNGLoopCount(data: Uint8Array, loopCount: number): Uint8Array {
+  // Find acTL chunk and modify num_plays field
+  let offset = 8; // signature
+  
+  while (offset < data.length - 8) {
+    const chunkLength = (data[offset] << 24) | (data[offset + 1] << 16) | (data[offset + 2] << 8) | data[offset + 3];
+    const chunkType = String.fromCharCode(data[offset + 4], data[offset + 5], data[offset + 6], data[offset + 7]);
+    
+    if (chunkType === 'acTL') {
+      // acTL chunk found
+      // Structure: num_frames (4 bytes) + num_plays (4 bytes)
+      // num_plays is at offset + 8 + 4 (skip chunk length, type, and num_frames)
+      const numPlaysOffset = offset + 12;
+      
+      // Create a copy of the data
+      const modifiedData = new Uint8Array(data);
+      
+      // Set num_plays (big-endian 32-bit integer)
+      modifiedData[numPlaysOffset] = (loopCount >> 24) & 0xFF;
+      modifiedData[numPlaysOffset + 1] = (loopCount >> 16) & 0xFF;
+      modifiedData[numPlaysOffset + 2] = (loopCount >> 8) & 0xFF;
+      modifiedData[numPlaysOffset + 3] = loopCount & 0xFF;
+      
+      // Recalculate CRC for the modified chunk
+      const crcOffset = offset + 8 + chunkLength;
+      const crcData = modifiedData.slice(offset + 4, crcOffset);
+      const newCrc = calculateCRC(crcData);
+      
+      modifiedData[crcOffset] = (newCrc >> 24) & 0xFF;
+      modifiedData[crcOffset + 1] = (newCrc >> 16) & 0xFF;
+      modifiedData[crcOffset + 2] = (newCrc >> 8) & 0xFF;
+      modifiedData[crcOffset + 3] = newCrc & 0xFF;
+      
+      return modifiedData;
+    }
+    // next chunk
+    offset += 12 + chunkLength; // length(4) + type(4) + data + crc(4)
+  }
+  
+  // If acTL chunk not found, return original data
+  return data;
+}
+
+// CRC calculation for PNG chunks
+function calculateCRC(data: Uint8Array): number {
+  let crc = 0xFFFFFFFF;
+  
+  for (let i = 0; i < data.length; i++) {
+    crc ^= data[i];
+    for (let j = 0; j < 8; j++) {
+      crc = (crc & 1) ? (0xEDB88320 ^ (crc >>> 1)) : (crc >>> 1);
+    }
+  }
+  
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+
 // Helper function to detect if a PNG file is animated
 async function isAnimatedPNG(file: File): Promise<boolean> {
   const buffer = await file.arrayBuffer();
@@ -339,13 +397,14 @@ function App() {
   const [editingFrame, setEditingFrame] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('dark');
   
   // New States
   const [exportFileName, setExportFileName] = useState("animation");
   const [resultSize, setResultSize] = useState<string | null>(null);
   const [apngCompression, setApngCompression] = useState(0);
   const [webpQuality, setWebpQuality] = useState(0.9);
+  const [loopCount, setLoopCount] = useState(0); // 0 = infinite, 1+ = specific count
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
@@ -549,7 +608,12 @@ function App() {
         buffers.push(imageData.data.buffer);
       }
       const apngBuffer = UPNG.encode(buffers, width, height, apngCompression, delays);
-      const blob = new Blob([apngBuffer], { type: 'image/png' });
+      
+      // Manually set loop count in acTL chunk
+      const apngData = new Uint8Array(apngBuffer);
+      const modifiedBuffer = setAPNGLoopCount(apngData, loopCount);
+      
+      const blob = new Blob([modifiedBuffer.buffer as ArrayBuffer], { type: 'image/png' });
       setResultSize(formatSize(blob.size));
       const url = URL.createObjectURL(blob);
       setGeneratedApng(url);
@@ -600,7 +664,7 @@ function App() {
         }
       }
       
-      const finalBlob = await assembleWebP(webpFrames, width, height);
+      const finalBlob = await assembleWebP(webpFrames, width, height, loopCount);
       setResultSize(formatSize(finalBlob.size));
       const url = URL.createObjectURL(finalBlob);
       setGeneratedWebP(url);
@@ -668,6 +732,24 @@ function App() {
                   setFrames(prev => prev.map(f => ({ ...f, delay: val })));
                 }} 
               />
+            </div>
+
+            <div className="control-group">
+              <RefreshCw size={18} />
+              <label>Loop Count:</label>
+              <select 
+                className="frame-delay-input"
+                style={{width: '100px', padding: '0.4rem'}}
+                value={loopCount} 
+                onChange={(e) => setLoopCount(parseInt(e.target.value))}
+              >
+                <option value={0}>Infinite</option>
+                <option value={1}>1 time</option>
+                <option value={2}>2 times</option>
+                <option value={3}>3 times</option>
+                <option value={5}>5 times</option>
+                <option value={10}>10 times</option>
+              </select>
             </div>
             
             <div style={{display: 'flex', gap: '1rem'}}>
