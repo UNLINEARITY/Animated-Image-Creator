@@ -12,7 +12,7 @@ Animated Image Creator is a browser-based animation tool that processes images e
 
 ### Format Support
 - **APNG Export**: High-quality animated PNG with adjustable compression level (0-9)
-- **WebP Export**: Efficient animated WebP with quality control (10%-100%)
+- **WebP Export**: Animated WebP with a quality slider (10%-100%) — **100% is true lossless** (VP8L, pixel-perfect)
 - **Import Formats**: PNG, JPG, WebP, and existing APNG files
 
 ### Frame Editing
@@ -20,6 +20,7 @@ Animated Image Creator is a browser-based animation tool that processes images e
 - **Precision Transform**: Manual adjustment of position (pan), scale (0.01x-20x), and rotation (-180° to 180°)
 - **Individual Frame Delays**: Set custom duration for each frame in milliseconds
 - **Base Frame Protection**: First frame defines canvas dimensions and cannot be transformed (ensures output consistency)
+- **Session Persistence**: Frames survive a normal page refresh (stored locally via IndexedDB); **Clear All** resets
 
 ### User Interface
 - **Drag & Drop**: Batch file upload with drag-and-drop support
@@ -128,7 +129,7 @@ src/
 | Format | File Size | Quality | Browser Support | Transparency |
 |--------|-----------|---------|-----------------|--------------|
 | APNG | Larger | Lossless | Chrome, Firefox, Safari | Full |
-| WebP | Smaller | Lossy adjustable | Chrome, Firefox, Edge | Full |
+| WebP | Smaller | Lossy adjustable, lossless at 100% | Chrome, Firefox, Edge | Full |
 
 ## Deployment
 

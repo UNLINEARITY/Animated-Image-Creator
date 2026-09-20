@@ -6,6 +6,8 @@ import {
 } from 'lucide-react';
 import './App.css';
 import { assembleWebP } from './utils/webp-assembler';
+import { encode as encodeWebPFrame } from '@jsquash/webp';
+import { saveFrames, loadFrames, clearFrames } from './utils/frame-store';
 
 const formatSize = (bytes: number) => {
   if (bytes === 0) return '0 B';
@@ -163,7 +165,7 @@ async function parseAPNG(file: File): Promise<Frame[]> {
   return frames;
 }
 
-interface Frame {
+export interface Frame {
   id: string;
   file: File;
   previewUrl: string;
@@ -390,7 +392,7 @@ const EditModal: React.FC<EditModalProps> = ({ frame, baseWidth, baseHeight, onS
 function App() {
   const [frames, setFrames] = useState<Frame[]>([]);
   const [isDraggingFile, setIsDraggingFile] = useState(false);
-  const [globalDelay, setGlobalDelay] = useState(100);
+  const [globalDelay, setGlobalDelay] = useState(500);
   const [generatedApng, setGeneratedApng] = useState<string | null>(null);
   const [generatedWebP, setGeneratedWebP] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -408,6 +410,29 @@ function App() {
 
   useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
   const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
+
+  // Session persistence: restore frames once on mount, then auto-save changes.
+  // Clear All empties the list, which in turn wipes the stored session.
+  const hydrated = useRef(false);
+  useEffect(() => {
+    let cancelled = false;
+    loadFrames().then((saved) => {
+      if (!cancelled && saved) {
+        setFrames(saved.map((f) => ({ ...f, previewUrl: URL.createObjectURL(f.file) })));
+      }
+    }).finally(() => { hydrated.current = true; });
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated.current) return;
+    if (frames.length === 0) {
+      clearFrames();
+      return;
+    }
+    const t = setTimeout(() => { saveFrames(frames).catch(() => {}); }, 250);
+    return () => clearTimeout(t);
+  }, [frames]);
 
   const handleFiles = useCallback(async (fileList: FileList | null) => {
     if (!fileList) return;
@@ -658,7 +683,16 @@ function App() {
         ctx.restore();
         
         // Export frame as WebP Blob
-        const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', webpQuality));
+        let blob: Blob | null;
+        if (webpQuality >= 1) {
+          // Quality 100% = true lossless (VP8L via libwebp WASM — canvas.toBlob cannot do lossless).
+          // exact=1 preserves RGB values under fully transparent pixels for archival fidelity.
+          const imageData = ctx.getImageData(0, 0, width, height);
+          const encoded = await encodeWebPFrame(imageData, { quality: 100, method: 6, lossless: 1, exact: 1 });
+          blob = new Blob([encoded], { type: 'image/webp' });
+        } else {
+          blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/webp', webpQuality));
+        }
         if (blob) {
             webpFrames.push({ image: blob, duration: frame.delay });
         }
@@ -893,9 +927,10 @@ function App() {
                       value={webpQuality}
                       onChange={(e) => setWebpQuality(parseFloat(e.target.value))}
                       style={{flex: 1}}
+                      title="100% = true lossless (pixel-perfect VP8L, larger file)"
                     />
-                    <span style={{fontSize: '0.875rem', color: 'var(--text-primary)', minWidth: '32px'}}>
-                      {Math.round(webpQuality * 100)}%
+                    <span style={{fontSize: '0.875rem', color: webpQuality >= 1 ? 'var(--accent, #646cff)' : 'var(--text-primary)', minWidth: '64px', fontWeight: webpQuality >= 1 ? 600 : 400}}>
+                      {webpQuality >= 1 ? 'Lossless' : `${Math.round(webpQuality * 100)}%`}
                     </span>
                   </div>
                   <div style={{display: 'flex', gap: '0.5rem', justifyContent: 'center'}}>

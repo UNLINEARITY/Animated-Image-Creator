@@ -12,6 +12,7 @@
   },
   "homepage": "https://unlinearity.github.io/Animated-Image-Creator/",
   "dependencies": {
+    "@jsquash/webp": "^1.5.0",
     "lucide-react": "^0.562.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
