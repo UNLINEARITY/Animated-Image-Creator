@@ -165,7 +165,7 @@ The project is pre-configured for GitHub Pages deployment.
 
 ## License
 
-MIT License - see LICENSE file for details
+AGPL-3.0-or-later — see the [LICENSE](LICENSE) file for details.
 
 ## Credits
 
