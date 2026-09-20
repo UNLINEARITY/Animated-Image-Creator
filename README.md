@@ -89,7 +89,6 @@ src/
 | `npm run build` | Build for production (`tsc && vite build`) |
 | `npm run preview` | Preview production build locally |
 | `npm run lint` | Run ESLint for code quality checks |
-| `npm run deploy` | Deploy to GitHub Pages (`gh-pages` branch) |
 
 ## Usage Guide
 
@@ -135,17 +134,15 @@ src/
 
 ### GitHub Pages
 
-The project is pre-configured for GitHub Pages deployment.
+The project auto-deploys through GitHub Actions.
 
-1. **Build and deploy**
-   ```bash
-   npm run deploy
-   ```
-
-2. **Enable GitHub Pages**
+1. **Enable GitHub Pages (one-time setup)**
    - Go to repository Settings > Pages
-   - Select source: `gh-pages` branch
-   - Your site will be available at `https://username.github.io/repository-name`
+   - Under "Build and deployment", set **Source** to `GitHub Actions`
+
+2. **Deploy**
+   - Push to `main` — the [workflow](.github/workflows/deploy.yml) builds the site and publishes it automatically
+   - Your site will be available at `https://unlinearity.github.io/Animated-Image-Creator/`
 
 ### Other Static Hosts
 
