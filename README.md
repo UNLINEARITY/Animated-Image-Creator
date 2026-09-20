@@ -26,7 +26,7 @@ Animated Image Creator is a browser-based animation tool that processes images e
 - **Drag & Drop**: Batch file upload with drag-and-drop support
 - **Visual Preview**: Real-time canvas preview with checkerboard transparency and crop mask overlay
 - **Frame Reordering**: Drag-and-drop frame sorting to change animation sequence
-- **Theme Support**: Light and dark mode with smooth transitions
+- **Theme Support**: Light, dark, and auto (system-following) modes with smooth transitions; your choice persists across sessions
 - **HiDPI Support**: Crisp rendering on Retina and high-DPI displays
 
 ### Performance & Privacy

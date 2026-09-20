@@ -1,7 +1,7 @@
 import React, { useState, useRef, useCallback, useEffect, useLayoutEffect } from 'react';
 import UPNG from 'upng-js';
 import {
-  Upload, Trash2, Clock, Download, Sun, Moon,
+  Upload, Trash2, Clock, Download, Sun, Moon, SunMoon,
   Move, ZoomIn, RotateCcw, X, Play, Minus, Plus, RefreshCw, Wand2, FileVideo, FilePenLine, Github
 } from 'lucide-react';
 import './App.css';
@@ -399,17 +399,40 @@ function App() {
   const [editingFrame, setEditingFrame] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [draggedFrameId, setDraggedFrameId] = useState<string | null>(null);
-  const [theme, setTheme] = useState<'light' | 'dark'>('light');
-  
+  const [themeMode, setThemeMode] = useState<'light' | 'dark' | 'auto'>(() => {
+    try {
+      const saved = localStorage.getItem('aic-theme');
+      return saved === 'light' || saved === 'dark' || saved === 'auto' ? saved : 'light';
+    } catch {
+      return 'light'; // storage unavailable (e.g. private mode)
+    }
+  });
+  const [systemDark, setSystemDark] = useState(
+    () => window.matchMedia('(prefers-color-scheme: dark)').matches
+  );
+
+  // Track the OS color scheme so "auto" follows it live
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const onChange = (e: MediaQueryListEvent) => setSystemDark(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  const theme: 'light' | 'dark' = themeMode === 'auto' ? (systemDark ? 'dark' : 'light') : themeMode;
+
+  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
+  useEffect(() => {
+    try { localStorage.setItem('aic-theme', themeMode); } catch { /* storage unavailable */ }
+  }, [themeMode]);
+  const cycleTheme = () => setThemeMode(prev => prev === 'light' ? 'dark' : prev === 'dark' ? 'auto' : 'light');
+
   // New States
   const [exportFileName, setExportFileName] = useState("animation");
   const [resultSize, setResultSize] = useState<string | null>(null);
   const [apngCompression, setApngCompression] = useState(0);
   const [webpQuality, setWebpQuality] = useState(0.9);
   const [loopCount, setLoopCount] = useState(0); // 0 = infinite, 1+ = specific count
-
-  useEffect(() => { document.documentElement.setAttribute('data-theme', theme); }, [theme]);
-  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   // Session persistence: restore frames once on mount, then auto-save changes.
   // Clear All empties the list, which in turn wipes the stored session.
@@ -730,8 +753,12 @@ function App() {
           >
             <Github size={20} />
           </a>
-          <button className="theme-toggle" onClick={toggleTheme} title="Toggle Theme">
-            {theme === 'light' ? <Moon size={20} /> : <Sun size={20} />}
+          <button
+            className="theme-toggle"
+            onClick={cycleTheme}
+            title={`Theme: ${themeMode === 'auto' ? 'Auto (follows system)' : themeMode === 'dark' ? 'Dark' : 'Light'} — click to change`}
+          >
+            {themeMode === 'auto' ? <SunMoon size={20} /> : themeMode === 'dark' ? <Moon size={20} /> : <Sun size={20} />}
           </button>
         </div>
       </header>
